@@ -1,0 +1,159 @@
+import 'package:flutter/cupertino.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shoping_app/data/db_helper.dart';
+import 'package:shoping_app/model/cart_model.dart';
+
+class CartProvider extends ChangeNotifier {
+  CartProvider() {
+    getPref();
+    getListData();
+  }
+
+  int _counter = 0;
+  bool isAdd=false;
+
+  int get counter => _counter;
+  double _totalPrice = 0.0;
+
+  double get totalPrice => _totalPrice;
+  DbHelper dbHelper = DbHelper.getInstance;
+  List<CartModel> _cartList = [];
+
+  List<CartModel> get getList => _cartList;
+
+
+  void deleteToCart(int id) async {
+    await dbHelper.deleteData(id);
+
+    getListData();
+    notifyListeners();
+  }
+  void updateQuantity(int id, int quantity) async {
+    await dbHelper.updateQuantity(id, quantity);
+    getListData();
+    notifyListeners();
+  }
+
+  Map<int, int> _itemQuantities = {}; // productId => quantity
+
+  int getQuantity(int productId) => _itemQuantities[productId] ?? 1;
+
+  void incrementQuantity(int productId) {
+    _itemQuantities[productId] = getQuantity(productId) + 1;
+    notifyListeners();
+  }
+
+  void decrementQuantity(int productId) {
+    if (getQuantity(productId) > 1) {
+      _itemQuantities[productId] = getQuantity(productId) - 1;
+      notifyListeners();
+    }
+
+  }
+   clearQuantity() {
+   _itemQuantities.clear();
+    notifyListeners();
+  }
+  clearCart() async {
+    _counter=0;
+    _totalPrice=0.0;
+
+    _itemQuantities.clear();
+
+    getListData();
+    notifyListeners();
+
+  }
+  void setPref() async {
+    SharedPreferences sp = await SharedPreferences.getInstance();
+    sp.setInt("counter", _itemQuantities as int);
+    sp.setInt("qn", _counter);
+    sp.setDouble("totalPrice", _totalPrice);
+    notifyListeners();
+  }
+
+  void getPref() async {
+    SharedPreferences sp = await SharedPreferences.getInstance();
+
+    _itemQuantities = (sp.getInt("qn") ?? 0) as Map<int, int>;
+    _counter = sp.getInt("counter") ?? 0;
+    _totalPrice = sp.getDouble("totalPrice") ?? 0.0;
+    notifyListeners();
+  }
+
+  void getListData() async {
+    _cartList = await dbHelper.getListData();
+
+    for (var item in _cartList) {
+      debugPrint(
+        "Product: ${item.productName}, Price: ${item.productPrice}, Quantity: ${item.quantity}",
+      );
+    }
+
+    notifyListeners();
+  }
+
+  void addToCart(
+    int id,
+    int productId,
+    String productName,
+    double productPrice,
+    int quantity,
+    double productBasePrice,
+    String productImage,
+    String productUnit,
+  ) async {
+    bool check = await dbHelper.insertData(
+      CartModel(
+        id: id,
+        productId: productId,
+        productName: productName,
+        productPrice: productPrice,
+        quantity: quantity,
+        productBasePrice: productBasePrice,
+        productImage: productImage,
+        productUnit: productUnit,
+      ),
+    );
+    if (check) {
+      getListData();
+      notifyListeners();
+    }
+  }
+
+
+
+  void incrementCounter() {
+    _counter++;
+    setPref();
+
+    notifyListeners();
+  }
+
+  void decrementCounter() {
+    _counter--;
+    setPref();
+
+    notifyListeners();
+  }
+
+  void incrementTotalPrice(var price) {
+    _totalPrice += price;
+    setPref();
+
+    notifyListeners();
+  }
+  void basePrice(var price) {
+    _totalPrice += price*getQuantity;
+    setPref();
+
+    notifyListeners();
+  }
+
+
+  void decrementTotalPrice(var price) {
+    _totalPrice -= price;
+    setPref();
+    notifyListeners();
+  }
+}
